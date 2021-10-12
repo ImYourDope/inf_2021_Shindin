@@ -1,3 +1,3 @@
 # inf_2021_Shindin
- IT'S A TEST PROJECT
+ MIPT 2021/2022 
   
