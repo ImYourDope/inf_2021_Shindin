@@ -6,7 +6,7 @@ import math
 
 
 # LIST OF PARAMETERS
-FPS = 30
+FPS = 60
 countdowntime = 3
 ball_points = 1
 square_points = 5
@@ -14,6 +14,7 @@ screen_xsize = 1200
 screen_ysize = 900
 font_name = 'Arial' # CODE IS CALIBRATED FOR ARIAL, USING ANOTHER FONTS WOULD LEAD TO TEXT DISPLACEMENT
 font_size = 50
+leaderboard_places = 10
 number_list = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 # BALL PARAMETERS
 ball_number = 5
@@ -29,8 +30,6 @@ minsquare_V = 300
 maxsquare_V = 400
 # DEFINITIONS
 timedelta = 1 / FPS
-playerscore = 0
-timecounter = 0
 # BALL DEFINITIONS
 ball_r = [None] * ball_number
 ball_x = [None] * ball_number
@@ -45,6 +44,9 @@ square_y = [None] * square_number
 square_Vx = [None] * square_number
 square_Vy = [None] * square_number
 square_color = [None] * square_number
+# LEADERBOARD DEFINITIONS
+leaderboard_name = []
+leaderboard_pps = []
 
 
 # LIST OF COLORS
@@ -127,16 +129,31 @@ def square_hitcheck(event, i):
     return (event.pos[0] >= square_x[i]) and (event.pos[0] <= square_x[i] + square_size[i]) and (
             event.pos[1] >= square_y[i]) and (event.pos[1] <= square_y[i] + square_size[i])
 
+
+# SORT LIST AND SORT ANOTHER AS FIRST
+def sort_twolists(list1, list2):
+    for i in range(len(list1)-1):
+        for j in range(len(list1)-i-1):
+            if (list1[j] > list1[j+1]):
+                list1[j], list1[j+1] = list1[j+1], list1[j]
+                list2[j], list2[j+1] = list2[j+1], list2[j]
+    list1.reverse()
+    list2.reverse()
+
+
 while True:
-    #CREATING/RESETING OBJECTS
+    # CREATING/RESETING OBJECTS
     pygame.init()
     pygame.font.init()
     game_font = pygame.font.SysFont(font_name, font_size)
     screen = pygame.display.set_mode((screen_xsize, screen_ysize))
     pygame.display.update()
     clock = pygame.time.Clock()
+    timecounter = 0
+    playerscore = 0
     game_ended = False
     game_started = False
+    file_read = True
     game_leaderboard = False
     input_playername = True
     playername = ''
@@ -144,7 +161,7 @@ while True:
     gametime = ''
 
 
-    #TEXT SURFACES
+    # TEXT SURFACES
     text_title = game_font.render('Ultimate Ball Clicking Game', True, black)
     text_rulestitle = game_font.render('Rules:', True, black)
     text_rules1 = game_font.render('Click as much figures as you can!', True, black)
@@ -161,25 +178,26 @@ while True:
     text_leaderboard = game_font.render('Press Left Control to view the leaderboard', True, black)
     text_leaderboardtitle = game_font.render('Leaderboard', True, black)
     text_leaderboardexit = game_font.render('Press Enter to exit', True, black)
+    text_leaderboarddescription = game_font.render('PPS - points per second', True, black)
     rect_playernameimput = (screen_xsize*7//24, screen_ysize//5+font_size+20, 10*font_size, font_size)
     rect_gametimeimput = (screen_xsize*9//24, screen_ysize//5+4*font_size+60, 6*font_size, font_size)
 
 
-    #START MENU
+    # START MENU
     def draw_startmenu():
         screen.fill(backgroundcolor)
-        #TITLE
-        screen.blit(text_title, (screen_xsize*4//15, 0))
-        #RULES
-        screen.blit(text_rulestitle, (screen_xsize*13//30, screen_ysize * 2 // 5 + 4 * font_size + 20))
-        screen.blit(text_rules1, (screen_xsize*3//15, screen_ysize * 2 // 5 + 5 * font_size + 30))
-        screen.blit(text_rules2, (screen_xsize*7//30, screen_ysize * 2 // 5 + 6 * font_size + 40))
-        screen.blit(text_rules3, (screen_xsize*2//15, screen_ysize * 2 // 5 + 7 * font_size + 50))
-        #ENTER
-        screen.blit(text_start1, (screen_xsize*2//15, screen_ysize//5))
-        screen.blit(text_start2, (screen_xsize//6, screen_ysize//5+2*font_size+30))
-        screen.blit(text_start3, (screen_xsize//3+20, screen_ysize//5+3*font_size+40))
-        #IMPUT SPACES
+        # TITLE
+        screen.blit(text_title, (screen_xsize//4, 0))
+        # RULES
+        screen.blit(text_rulestitle, (screen_xsize*9//20, screen_ysize * 2 // 5 + 4 * font_size + 20))
+        screen.blit(text_rules1, (screen_xsize*3//16, screen_ysize * 2 // 5 + 5 * font_size + 30))
+        screen.blit(text_rules2, (screen_xsize*5//24, screen_ysize * 2 // 5 + 6 * font_size + 40))
+        screen.blit(text_rules3, (screen_xsize//8, screen_ysize * 2 // 5 + 7 * font_size + 50))
+        # ENTER
+        screen.blit(text_start1, (screen_xsize*13//120, screen_ysize//5))
+        screen.blit(text_start2, (screen_xsize*37//240, screen_ysize//5+2*font_size+30))
+        screen.blit(text_start3, (screen_xsize*7//20, screen_ysize//5+3*font_size+40))
+        # IMPUT SPACES
         rect(screen, white, rect_playernameimput)
         rect(screen, black, rect_playernameimput, 1)
         rect(screen, white, rect_gametimeimput)
@@ -188,12 +206,14 @@ while True:
 
     draw_startmenu()
     pygame.display.update()
-    #INPUTBOXES
+    # INPUTBOXES
     while not game_started:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
                 if input_time == True:
                     if event.key == pygame.K_RETURN:
                         game_started = True
@@ -219,20 +239,23 @@ while True:
                 pygame.display.update()
 
 
-    #LOADING SCREEN
+    # LOADING SCREEN
     clock.tick(1)
     for i in range (countdowntime):
         screen.fill(backgroundcolor)
-        screen.blit(text_load, (screen_xsize*4//15+20, screen_ysize//5))
+        screen.blit(text_load, (screen_xsize*17//60, screen_ysize//5))
         screen.blit(game_font.render(str(countdowntime-i), True, black), (screen_xsize//2-10, screen_ysize//5+font_size+1))
         pygame.display.update()
         clock.tick(1)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
+            if event.type == pygame.KEYDOWN:
+             if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
 
 
-    #STARTING OBJECTS
+    # STARTING OBJECTS
     gametime = int(gametime)
     timer = FPS * gametime
     for i in range(ball_number):
@@ -243,17 +266,20 @@ while True:
         square_draw(i)
 
 
-    #GAME SECTION
+    # GAME SECTION
     while not game_ended:
         clock.tick(FPS)
-        #TIMER
+        # TIMER
         timecounter += 1
         if (timecounter >= timer):
             game_ended = True
             file_leaderboard = open('leaderboard', 'a')
-            print(playername, playerscore, file = file_leaderboard)
+            pointspersecond = 0.0
+            if gametime != 0:
+                pointspersecond = round(playerscore/gametime, 2)
+            print(playername, pointspersecond, file = file_leaderboard)
             file_leaderboard.close()
-        #OBJECT PROCESSING
+        # OBJECT PROCESSING
         for i in range(ball_number):
             ball_wallbounce(i)
             ball_x[i] += ball_Vx[i] * timedelta
@@ -264,14 +290,19 @@ while True:
             square_x[i] += square_Vx[i] * timedelta
             square_y[i] += square_Vy[i] * timedelta
             square_draw(i)
-        #TEXT PROCESSING
-        text_info = game_font.render('Score: ' + str(playerscore) + '               Time remaining: ' + str(gametime-timecounter//30), False, black)
-        screen.blit(text_info, (0, 0))
+        # TEXT PROCESSING
+        text_infoscore = game_font.render('Score: ' + str(playerscore), False, black)
+        text_infotimeremaining = game_font.render('Time remaining: ' + str(gametime-timecounter//FPS), False, black)
+        screen.blit(text_infoscore, (0, 0))
+        screen.blit(text_infotimeremaining, (screen_xsize//3, 0))
         pygame.display.update()
-        #EVENT PROCESSING
+        # EVENT PROCESSING
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                game_ended = True
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
             elif (event.type == pygame.MOUSEBUTTONDOWN) and (event.button == 1):
                 for i in range(ball_number):
                     if ball_hitcheck(event, i) == True:
@@ -284,21 +315,23 @@ while True:
         screen.fill(backgroundcolor)
 
 
-    #RESULTS
+    # RESULTS
     while game_ended:
         screen.fill(backgroundcolor)
         text_finalscore = game_font.render(str(playerscore), True, black)
-        screen.blit(text_results, (screen_xsize*5//15, screen_ysize//5))
-        screen.blit(text_finalscore, (screen_xsize//2-10, screen_ysize//5+font_size+10))
-        screen.blit(text_congratulations, (screen_xsize*25//60, screen_ysize//5+2*font_size+20))
-        screen.blit(text_exit, (screen_xsize*10//30, screen_ysize*4//5))
-        screen.blit(text_restart, (screen_xsize*9//30, screen_ysize*4//5 - font_size - 10))
-        screen.blit(text_leaderboard, (screen_xsize*4//30, screen_ysize*4//5 - 2*font_size - 20))
+        screen.blit(text_results, (screen_xsize//3, screen_ysize//5))
+        screen.blit(text_finalscore, (screen_xsize//2-20, screen_ysize//5+font_size+10))
+        screen.blit(text_congratulations, (screen_xsize*5//12, screen_ysize//5+2*font_size+20))
+        screen.blit(text_exit, (screen_xsize//3, screen_ysize*4//5))
+        screen.blit(text_restart, (screen_xsize*7//24, screen_ysize*4//5 - font_size - 10))
+        screen.blit(text_leaderboard, (screen_xsize*9//80, screen_ysize*4//5 - 2*font_size - 20))
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
                 if event.key == pygame.K_RETURN:
                     pygame.quit()
                 if event.key == pygame.K_SPACE:
@@ -306,13 +339,33 @@ while True:
                 if event.key == pygame.K_LCTRL:
                     game_leaderboard = True
                     while game_leaderboard:
+                        if file_read:
+                            file = open('leaderboard', 'r')
+                            while True:
+                                line = file.readline()
+                                if not line:
+                                    file_read = False
+                                    break
+                                ldname, ldpps = line.split()
+                                leaderboard_name.append(line.split()[0])
+                                leaderboard_pps.append(float(line.split()[1].replace('\n', '')))
+                            file.close()
+                            sort_twolists(leaderboard_pps, leaderboard_name)
                         screen.fill(backgroundcolor)
-                        screen.blit(text_leaderboardtitle, (screen_xsize*6//15, 0))
-                        screen.blit(text_leaderboardexit, (screen_xsize*9//30, screen_ysize-2*font_size-10))
+                        screen.blit(text_leaderboardtitle, (screen_xsize*3//8, 15))
+                        screen.blit(text_leaderboardexit, (screen_xsize//3, screen_ysize-2*font_size-10))
+                        screen.blit(text_leaderboarddescription, (screen_xsize * 11 // 40, screen_ysize - 3 * font_size - 20))
+                        leaderboard_size = min(leaderboard_places, len(leaderboard_name))
+                        for i in range(leaderboard_size):
+                            screen.blit(game_font.render(str(i+1) + '. ' + leaderboard_name[i] + '.  PPS: ' + str(leaderboard_pps[i]), True, black), (20, screen_ysize//10+i*(font_size+10)))
                         pygame.display.update()
                         for event in pygame.event.get():
                             if event.type == pygame.QUIT:
+                                game_leaderboard = False
                                 pygame.quit()
                             if event.type == pygame.KEYDOWN:
+                                if event.key == pygame.K_ESCAPE:
+                                    game_leaderboard = False
+                                    pygame.quit()
                                 if event.key == pygame.K_RETURN:
                                     game_leaderboard = False
